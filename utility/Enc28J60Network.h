@@ -80,7 +80,7 @@
         #define ENC28J60_CONTROL_CS     PIN_A10
         #warning "Using LEONARDO borad PIN_A10 for ENC28J60_CONTROL_CS. Use UIPEthernet::init(uint8_t) to change it."
       #else
-        #define ENC28J60_CONTROL_CS     SS
+        #define ENC28J60_CONTROL_CS     D1 //SS
       #endif
    #elif defined(ARDUINO_ARCH_AMEBA) //Defined SS to pin 10
       #define ENC28J60_CONTROL_CS     SS //PC_0 A5 10
