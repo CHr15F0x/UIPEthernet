@@ -58,14 +58,14 @@ extern "C"
 
 #define ip_addr_uip(a) IPAddress(a[0] & 0xFF, a[0] >> 8 , a[1] & 0xFF, a[1] >> 8) //TODO this is not IPV6 capable
 
-#define uip_seteth_addr(eaddr) do {uip_ethaddr.addr[0] = eaddr[0]; \
-                              uip_ethaddr.addr[1] = eaddr[1];\
-                              uip_ethaddr.addr[2] = eaddr[2];\
-                              uip_ethaddr.addr[3] = eaddr[3];\
-                              uip_ethaddr.addr[4] = eaddr[4];\
-                              uip_ethaddr.addr[5] = eaddr[5];} while(0)
+#define uip_seteth_addr(eaddr) do {uip_ethaddr[if_idx].addr[0] = eaddr[0]; \
+                              uip_ethaddr[if_idx].addr[1] = eaddr[1];\
+                              uip_ethaddr[if_idx].addr[2] = eaddr[2];\
+                              uip_ethaddr[if_idx].addr[3] = eaddr[3];\
+                              uip_ethaddr[if_idx].addr[4] = eaddr[4];\
+                              uip_ethaddr[if_idx].addr[5] = eaddr[5];} while(0)
 
-#define BUF ((struct uip_tcpip_hdr *)&uip_buf[UIP_LLH_LEN])
+#define BUF ((struct uip_tcpip_hdr *)&uip_buf[if_idx][UIP_LLH_LEN])
 
 enum EthernetLinkStatus {
   Unknown,
@@ -141,5 +141,6 @@ private:
 };
 
 extern UIPEthernetClass UIPEthernet;
+extern UIPEthernetClass UIPEthernet2;
 
 #endif

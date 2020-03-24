@@ -38,7 +38,10 @@ extern "C"
 #include "utility/uip_timer.h"
 }
 
-#define ETH_HDR ((struct uip_eth_hdr *)&uip_buf[0])
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+
+#define ETH_HDR ((struct uip_eth_hdr *)&uip_buf[if_idx][0])
 
 memhandle UIPEthernetClass::in_packet(NOBLOCK);
 memhandle UIPEthernetClass::uip_packet(NOBLOCK);
@@ -238,20 +241,20 @@ if (Enc28J60Network::geterevid()==0)
   if (in_packet != NOBLOCK)
     {
     packetstate = UIPETHERNET_FREEPACKET;
-    uip_len = Enc28J60Network::blockSize(in_packet);
-    if (uip_len > 0)
+    uip_len[if_idx] = Enc28J60Network::blockSize(in_packet);
+    if (uip_len[if_idx] > 0)
       {
-      Enc28J60Network::readPacket(in_packet,0,(uint8_t*)uip_buf,UIP_BUFSIZE);
+      Enc28J60Network::readPacket(in_packet,0,(uint8_t*)uip_buf[if_idx],UIP_BUFSIZE);
       if (ETH_HDR ->type == HTONS(UIP_ETHTYPE_IP))
         {
         uip_packet = in_packet; //required for upper_layer_checksum of in_packet!
         #if ACTLOGLEVEL>=LOG_DEBUG
           LogObject.uart_send_str(F("UIPEthernetClass::tick() DEBUG:readPacket type IP, uip_len: "));
-          LogObject.uart_send_decln(uip_len);
+          LogObject.uart_send_decln(uip_len[if_idx]);
         #endif
         uip_arp_ipin();
         uip_input();
-        if (uip_len > 0)
+        if (uip_len[if_idx] > 0)
           {
           uip_arp_out();
           network_send();
@@ -261,10 +264,10 @@ if (Enc28J60Network::geterevid()==0)
              {
              #if ACTLOGLEVEL>=LOG_DEBUG
                LogObject.uart_send_str(F("UIPEthernetClass::tick() DEBUG:readPacket type ARP, uip_len: "));
-               LogObject.uart_send_decln(uip_len);
+               LogObject.uart_send_decln(uip_len[if_idx]);
              #endif
              uip_arp_arpin();
-             if (uip_len > 0)
+             if (uip_len[if_idx] > 0)
                {
                network_send();
                }
@@ -296,7 +299,7 @@ if (Enc28J60Network::geterevid()==0)
         {
 #endif
 
-      uip_conn = &uip_conns[i];
+      uip_conn[if_idx] = &uip_conns[if_idx][i];
 
 #if UIP_CLIENT_TIMER >= 0
       if (periodic)
@@ -309,11 +312,11 @@ if (Enc28J60Network::geterevid()==0)
         }
       else
         {
-        if (uip_conn!=NULL)
+        if (uip_conn[if_idx]!=NULL)
            {
-           if (((uip_userdata_t*)uip_conn->appstate)!=NULL)
+           if (((uip_userdata_t*)uip_conn[if_idx]->appstate)!=NULL)
               {
-              if ((long)( now - ((uip_userdata_t*)uip_conn->appstate)->timer) >= 0)
+              if ((long)( now - ((uip_userdata_t*)uip_conn[if_idx]->appstate)->timer) >= 0)
                  {
                  uip_process(UIP_POLL_REQUEST);
                  }
@@ -327,7 +330,7 @@ if (Enc28J60Network::geterevid()==0)
               #if ACTLOGLEVEL>=LOG_DEBUG_V3
                  LogObject.uart_send_strln(F("UIPEthernetClass::tick() DEBUG_V3:((uip_userdata_t*)uip_conn->appstate) is NULL"));
               #endif
-              if ((long)( now - ((uip_userdata_t*)uip_conn)->timer) >= 0)
+              if ((long)( now - ((uip_userdata_t*)uip_conn[if_idx])->timer) >= 0)
                  {
                  uip_process(UIP_POLL_REQUEST);
                  }
@@ -349,7 +352,7 @@ if (Enc28J60Network::geterevid()==0)
         // If the above function invocation resulted in data that
         // should be sent out on the Enc28J60Network, the global variable
         // uip_len is set to a value > 0.
-      if (uip_len > 0)
+      if (uip_len[if_idx] > 0)
         {
           uip_arp_out();
           network_send();
@@ -367,9 +370,9 @@ if (Enc28J60Network::geterevid()==0)
           // If the above function invocation resulted in data that
           // should be sent out on the Enc28J60Network, the global variable
           // uip_len is set to a value > 0. */
-          if (uip_len > 0)
+          if (uip_len[if_idx] > 0)
             {
-              UIPUDP::_send((uip_udp_userdata_t *)(uip_udp_conns[i].appstate));
+              UIPUDP::_send((uip_udp_userdata_t *)(uip_udp_conns[if_idx][i].appstate));
             }
         }
 #endif /* UIP_UDP */
@@ -389,20 +392,20 @@ bool UIPEthernetClass::network_send()
       LogObject.uart_send_str(F(", hdrlen: "));
       LogObject.uart_send_decln(uip_hdrlen);
 #endif
-      Enc28J60Network::writePacket(uip_packet,0,uip_buf,uip_hdrlen);
+      Enc28J60Network::writePacket(uip_packet,0,uip_buf[if_idx],uip_hdrlen);
       packetstate &= ~ UIPETHERNET_SENDPACKET;
       goto sendandfree;
     }
-  uip_packet = Enc28J60Network::allocBlock(uip_len);
+  uip_packet = Enc28J60Network::allocBlock(uip_len[if_idx]);
   if (uip_packet != NOBLOCK)
     {
 #if ACTLOGLEVEL>=LOG_DEBUG
       LogObject.uart_send_str(F("UIPEthernetClass::network_send() DEBUG:uip_buf (uip_len): "));
-      LogObject.uart_send_dec(uip_len);
+      LogObject.uart_send_dec(uip_len[if_idx]);
       LogObject.uart_send_str(F(", packet: "));
       LogObject.uart_send_decln(uip_packet);
 #endif
-      Enc28J60Network::writePacket(uip_packet,0,uip_buf,uip_len);
+      Enc28J60Network::writePacket(uip_packet,0,uip_buf[if_idx],uip_len[if_idx]);
       goto sendandfree;
     }
   return false;
@@ -445,6 +448,8 @@ void UIPEthernetClass::configure(IPAddress ip, IPAddress dns, IPAddress gateway,
 }
 
 UIPEthernetClass UIPEthernet;
+
+UIPEthernetClass UIPEthernet2;
 
 /*---------------------------------------------------------------------------*/
 uint16_t
@@ -491,7 +496,7 @@ UIPEthernetClass::ipchksum(void)
   #endif
   uint16_t sum;
 
-  sum = chksum(0, &uip_buf[UIP_LLH_LEN], UIP_IPH_LEN);
+  sum = chksum(0, &uip_buf[if_idx][UIP_LLH_LEN], UIP_IPH_LEN);
   return (sum == 0) ? 0xffff : htons(sum);
 }
 
@@ -549,7 +554,7 @@ uip_tcpchksum(void)
     break;
   }
 #endif
-  sum = UIPEthernetClass::chksum(sum, &uip_buf[UIP_IPH_LEN + UIP_LLH_LEN], upper_layer_memlen);
+  sum = UIPEthernetClass::chksum(sum, &uip_buf[if_idx][UIP_IPH_LEN + UIP_LLH_LEN], upper_layer_memlen);
 #if ACTLOGLEVEL>=LOG_DEBUG
   #if UIP_UDP
     LogObject.uart_send_str(F("UIPEthernetClass::upper_layer_chksum(uint8_t proto) DEBUG:uip_buf["));
@@ -609,3 +614,5 @@ uip_udpchksum(void)
   return sum;
 }
 #endif
+
+#pragma GCC diagnostic pop

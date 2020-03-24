@@ -28,9 +28,12 @@ extern "C" {
 #include "utility/uip_arp.h"
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+
 #if UIP_UDP
 #define UIP_ARPHDRSIZE 42
-#define UDPBUF ((struct uip_udpip_hdr *)&uip_buf[UIP_LLH_LEN])
+#define UDPBUF ((struct uip_udpip_hdr *)&uip_buf[if_idx][UIP_LLH_LEN])
 
 // Constructor
 UIPUDP::UIPUDP(void) :
@@ -187,7 +190,7 @@ UIPUDP::endPacket(void)
       appdata.send = true;
       Enc28J60Network::resizeBlock(appdata.packet_out,0,appdata.out_pos);
       uip_udp_periodic_conn(_uip_udp_conn);
-      if (uip_len > 0)
+      if (uip_len[if_idx] > 0)
         {
     	  _send(&appdata);
           return 1;
@@ -367,14 +370,14 @@ uipudp_appcall(void) {
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("uipudp_appcall(void) DEBUG_V3:Function started"));
   #endif
-  if (uip_udp_userdata_t *data = (uip_udp_userdata_t *)(uip_udp_conn->appstate))
+  if (uip_udp_userdata_t *data = (uip_udp_userdata_t *)(uip_udp_conn[if_idx]->appstate))
     {
       if (uip_newdata())
         {
           if (data->packet_next == NOBLOCK)
             {
-              uip_udp_conn->rport = UDPBUF->srcport;
-              uip_ipaddr_copy(uip_udp_conn->ripaddr,UDPBUF->srcipaddr);
+              uip_udp_conn[if_idx]->rport = UDPBUF->srcport;
+              uip_ipaddr_copy(uip_udp_conn[if_idx]->ripaddr,UDPBUF->srcipaddr);
               data->packet_next = Enc28J60Network::allocBlock(ntohs(UDPBUF->udplen)-UIP_UDPH_LEN);
                   //if we are unable to allocate memory the packet is dropped. udp doesn't guarantee packet delivery
               if (data->packet_next != NOBLOCK)
@@ -412,7 +415,7 @@ UIPUDP::_send(uip_udp_userdata_t *data) {
     LogObject.uart_send_strln(F("UIPUDP::_send(uip_udp_userdata_t *data) DEBUG_V3:Function started"));
   #endif
   uip_arp_out(); //add arp
-  if (uip_len == UIP_ARPHDRSIZE)
+  if (uip_len[if_idx] == UIP_ARPHDRSIZE)
     {
       UIPEthernetClass::uip_packet = NOBLOCK;
       UIPEthernetClass::packetstate &= ~UIPETHERNET_SENDPACKET;
@@ -434,3 +437,5 @@ UIPUDP::_send(uip_udp_userdata_t *data) {
   UIPEthernetClass::network_send();
 }
 #endif
+
+#pragma GCC diagnostic push

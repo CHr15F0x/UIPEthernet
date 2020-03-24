@@ -1,5 +1,8 @@
 #ifndef UIP_DEBUG_H
 #define UIP_DEBUG_H
+
+#if 0 // klis disable completely
+
 extern "C" {
   #include "utility/uip.h"
 }
@@ -14,5 +17,6 @@ public:
 
 };
 
+#endif // 0
 
 #endif

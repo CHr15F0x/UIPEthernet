@@ -21,7 +21,7 @@
 #define	LOG_DEBUG_V2		9	/* debug-verbose-level (vv) messages */
 #define	LOG_DEBUG_V3		10	/* debug-verbose-level (vvv) messages */
 
-#warning "You can configure LogObject and ACTLOGLEVEL in 'utility/logging.h'. More verbosity more memory usage."
+//#warning "You can configure LogObject and ACTLOGLEVEL in 'utility/logging.h'. More verbosity more memory usage."
 #define ACTLOGLEVEL     LOG_NONE
 //#define ACTLOGLEVEL LOG_WARNING
 //#define ACTLOGLEVEL LOG_INFO

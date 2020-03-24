@@ -11,6 +11,8 @@ extern "C" {
   #include "utility/uip.h"
 }
 
+#if 0 // klis disable completely
+
 struct uip_conn con[UIP_CONNS];
 
 void
@@ -18,7 +20,7 @@ UIPDebug::uip_debug_printconns()
 {
   for(uint8_t i=0;i<UIP_CONNS;i++)
     {
-      if (uip_debug_printcon(&con[i],&uip_conns[i]))
+      if (uip_debug_printcon(&con[i],&uip_conns[if_idx][i]))
         {
 	#if ACTLOGLEVEL>LOG_NONE
           LogObject.uart_send_str(F("connection["));
@@ -209,3 +211,6 @@ UIPDebug::uip_debug_printbytes(const uint8_t *data, uint8_t len)
     #endif
     }
 }
+
+#endif //
+

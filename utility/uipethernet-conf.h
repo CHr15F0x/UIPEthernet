@@ -1,6 +1,11 @@
 #ifndef UIPETHERNET_CONF_H
 #define UIPETHERNET_CONF_H
 
+/* number of Ethernet interfaces handled by uip */
+#ifndef UIP_NUM_INTERFACES
+#define UIP_NUM_INTERFACES 2
+#endif
+
 /* for TCP */
 #ifndef UIP_SOCKET_NUMPACKETS
 #define UIP_SOCKET_NUMPACKETS    5

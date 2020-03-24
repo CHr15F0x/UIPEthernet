@@ -320,7 +320,7 @@ UIPClient::read(uint8_t *buf, size_t size)
             {
               remain -= read;
               _eatBlock(&data->packets_in[0]);
-              if (uip_stopped(&uip_conns[data->conn_index]) && !(data->state & (UIP_CLIENT_CLOSE | UIP_CLIENT_REMOTECLOSED)))
+              if (uip_stopped(&uip_conns[if_idx][data->conn_index]) && !(data->state & (UIP_CLIENT_CLOSE | UIP_CLIENT_REMOTECLOSED)))
                 data->state |= UIP_CLIENT_RESTART;
               if (data->packets_in[0] == NOBLOCK)
                 {
@@ -393,7 +393,7 @@ uipclient_appcall(void)
     LogObject.uart_send_strln(F("uipclient_appcall(void) DEBUG_V3:Function started"));
   #endif
   uint16_t send_len = 0;
-  uip_userdata_t *u = (uip_userdata_t*)uip_conn->appstate;
+  uip_userdata_t *u = (uip_userdata_t*)uip_conn[if_idx]->appstate;
   if (!u && uip_connected())
     {
 #if ACTLOGLEVEL>=LOG_DEBUG_V2
@@ -403,7 +403,7 @@ uipclient_appcall(void)
       u = (uip_userdata_t*) UIPClient::_allocateData();
       if (u)
         {
-          uip_conn->appstate = u;
+          uip_conn[if_idx]->appstate = u;
 #if ACTLOGLEVEL>=LOG_DEBUG_V1
           LogObject.uart_send_str(F("uipclient_appcall(void) DEBUG_V1:UIPClient allocated state: "));
           LogObject.uart_send_binln(u->state);
@@ -420,18 +420,18 @@ uipclient_appcall(void)
         {
 #if ACTLOGLEVEL>=LOG_DEBUG
           LogObject.uart_send_str(F("uipclient_appcall(void) DEBUG:UIPClient uip_newdata, uip_len:"));
-          LogObject.uart_send_decln(uip_len);
+          LogObject.uart_send_decln(uip_len[if_idx]);
 #endif
-          if (uip_len && !(u->state & (UIP_CLIENT_CLOSE | UIP_CLIENT_REMOTECLOSED)))
+          if (uip_len[if_idx] && !(u->state & (UIP_CLIENT_CLOSE | UIP_CLIENT_REMOTECLOSED)))
             {
               for (uint8_t i=0; i < UIP_SOCKET_NUMPACKETS; i++)
                 {
                   if (u->packets_in[i] == NOBLOCK)
                     {
-                      u->packets_in[i] = Enc28J60Network::allocBlock(uip_len);
+                      u->packets_in[i] = Enc28J60Network::allocBlock(uip_len[if_idx]);
                       if (u->packets_in[i] != NOBLOCK)
                         {
-                          Enc28J60Network::copyPacket(u->packets_in[i],0,UIPEthernetClass::in_packet,((uint8_t*)uip_appdata)-uip_buf,uip_len);
+                          Enc28J60Network::copyPacket(u->packets_in[i],0,UIPEthernetClass::in_packet,((uint8_t*)uip_appdata[if_idx])-uip_buf[if_idx],uip_len[if_idx]);
                           if (i == UIP_SOCKET_NUMPACKETS-1)
                             uip_stop();
                           goto finish_newdata;
@@ -459,7 +459,7 @@ finish_newdata:
           UIPClient::_flushBlocks(&u->packets_out[0]);
           if (u->packets_in[0] != NOBLOCK)
             {
-              ((uip_userdata_closed_t *)u)->lport = uip_conn->lport;
+              ((uip_userdata_closed_t *)u)->lport = uip_conn[if_idx]->lport;
               u->state |= UIP_CLIENT_REMOTECLOSED;
             }
           else
@@ -469,7 +469,7 @@ finish_newdata:
           LogObject.uart_send_strln(F("uipclient_appcall(void) DEBUG_V2:After UIPClient uip_closed"));
           UIPClient::_dumpAllData();
 #endif
-          uip_conn->appstate = NULL;
+          uip_conn[if_idx]->appstate = NULL;
           goto finish;
         }
       if (uip_acked())
@@ -498,7 +498,7 @@ finish_newdata:
                 send_len = Enc28J60Network::blockSize(u->packets_out[0]);
               if (send_len > 0)
                 {
-                  UIPEthernetClass::uip_hdrlen = ((uint8_t*)uip_appdata)-uip_buf;
+                  UIPEthernetClass::uip_hdrlen = ((uint8_t*)uip_appdata[if_idx])-uip_buf[if_idx];
                   UIPEthernetClass::uip_packet = Enc28J60Network::allocBlock(UIPEthernetClass::uip_hdrlen+send_len);
                   if (UIPEthernetClass::uip_packet != NOBLOCK)
                     {
@@ -519,7 +519,7 @@ finish_newdata:
           if (u->packets_out[0] == NOBLOCK)
             {
               u->state = 0;
-              uip_conn->appstate = NULL;
+              uip_conn[if_idx]->appstate = NULL;
               uip_close();
 #if ACTLOGLEVEL>=LOG_DEBUG_V2
               LogObject.uart_send_strln(F("uipclient_appcall(void) DEBUG_V2:no blocks out -> free userdata"));
@@ -536,11 +536,11 @@ finish_newdata:
         }
     }
   finish:
-  uip_send(uip_appdata,send_len);
-  uip_len = send_len;
+  uip_send(uip_appdata[if_idx],send_len);
+  uip_len[if_idx] = send_len;
 #if ACTLOGLEVEL>=LOG_DEBUG_V3
   LogObject.uart_send_str(F("uipclient_appcall(void) DEBUG_V3: uip_len set to:"));
-  LogObject.uart_send_decln(uip_len);
+  LogObject.uart_send_decln(uip_len[if_idx]);
 #endif
 }
 
@@ -555,7 +555,7 @@ UIPClient::_allocateData()
       uip_userdata_t* data = &UIPClient::all_data[sock];
       if (!data->state)
         {
-          data->conn_index = uip_conn - uip_conns;
+          data->conn_index = uip_conn[if_idx] - uip_conns[if_idx];
           data->state = UIP_CLIENT_CONNECTED;
           memset(&data->packets_in[0],0,sizeof(uip_userdata_t)-sizeof(data->state));
           return data;
