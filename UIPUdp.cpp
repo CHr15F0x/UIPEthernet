@@ -27,6 +27,8 @@ extern "C" {
 #include "utility/uip_arp.h"
 }
 
+#include "UIPEthernet.h"
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 
@@ -35,8 +37,7 @@ extern "C" {
 #define UDPBUF ((struct uip_udpip_hdr *)&uip_buf[if_idx][UIP_LLH_LEN])
 
 // Constructor
-UIPUDP::UIPUDP(UIPEthernetClass &uip_eth) :
-    eth(uip_eth),
+UIPUDP::UIPUDP() :
     _uip_udp_conn(NULL)
 {
   memset(&appdata,0,sizeof(appdata));
@@ -74,9 +75,9 @@ UIPUDP::stop(void)
       uip_udp_remove(_uip_udp_conn);
       _uip_udp_conn->appstate = NULL;
       _uip_udp_conn=NULL;
-      Enc28J60Network::freeBlock(appdata.packet_in);
-      Enc28J60Network::freeBlock(appdata.packet_next);
-      Enc28J60Network::freeBlock(appdata.packet_out);
+      uip_enc[if_idx]->freeBlock(appdata.packet_in);
+      uip_enc[if_idx]->freeBlock(appdata.packet_next);
+      uip_enc[if_idx]->freeBlock(appdata.packet_out);
       memset(&appdata,0,sizeof(appdata));
     }
 }
@@ -91,7 +92,7 @@ UIPUDP::beginPacket(IPAddress ip, uint16_t port)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPUDP::beginPacket(IPAddress ip, uint16_t port) DEBUG_V3:Function started"));
   #endif
-  eth.tick();
+  uip_eth[if_idx]->tick();
   if (ip && port)
     {
       uip_ipaddr_t ripaddr;
@@ -138,7 +139,7 @@ UIPUDP::beginPacket(IPAddress ip, uint16_t port)
     {
       if (appdata.packet_out == NOBLOCK)
         {
-          appdata.packet_out = Enc28J60Network::allocBlock(UIP_UDP_MAXPACKETSIZE);
+          appdata.packet_out = uip_enc[if_idx]->allocBlock(UIP_UDP_MAXPACKETSIZE);
           appdata.out_pos = UIP_UDP_PHYH_LEN;
           if (appdata.packet_out != NOBLOCK)
             return 1;
@@ -168,7 +169,7 @@ UIPUDP::beginPacket(const char *host, uint16_t port)
   DNSClient dns;
   IPAddress remote_addr;
 
-  dns.begin(UIPEthernet.dnsServerIP());
+  dns.begin(uip_eth[if_idx]->dnsServerIP());
   ret = dns.getHostByName(host, remote_addr);
   if (ret == 1) {
     return beginPacket(remote_addr, port);
@@ -188,7 +189,7 @@ UIPUDP::endPacket(void)
   if (_uip_udp_conn && appdata.packet_out != NOBLOCK)
     {
       appdata.send = true;
-      Enc28J60Network::resizeBlock(appdata.packet_out,0,appdata.out_pos);
+      uip_enc[if_idx]->resizeBlock(appdata.packet_out,0,appdata.out_pos);
       uip_udp_periodic_conn(_uip_udp_conn);
       if (uip_len[if_idx] > 0)
         {
@@ -218,7 +219,7 @@ UIPUDP::write(const uint8_t *buffer, size_t size)
   #endif
   if (appdata.packet_out != NOBLOCK)
     {
-      size_t ret = Enc28J60Network::writePacket(appdata.packet_out,appdata.out_pos,(uint8_t*)buffer,size);
+      size_t ret = uip_enc[if_idx]->writePacket(appdata.packet_out,appdata.out_pos,(uint8_t*)buffer,size);
       appdata.out_pos += ret;
       return ret;
     }
@@ -233,14 +234,14 @@ UIPUDP::parsePacket(void)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPUDP::parsePacket(void) DEBUG_V3:Function started"));
   #endif
-  eth.tick();
+  uip_eth[if_idx]->tick();
   if (appdata.packet_in != NOBLOCK)
     {
     #if ACTLOGLEVEL>=LOG_DEBUG
       LogObject.uart_send_str(F("UIPUDP::parsePacket(void) DEBUG:udp parsePacket freeing previous packet: "));
       LogObject.uart_send_decln(appdata.packet_in);
     #endif
-    Enc28J60Network::freeBlock(appdata.packet_in);
+    uip_enc[if_idx]->freeBlock(appdata.packet_in);
     }
 
   appdata.packet_in = appdata.packet_next;
@@ -253,7 +254,7 @@ UIPUDP::parsePacket(void)
       LogObject.uart_send_dec(appdata.packet_in);
     }
 #endif
-  int size = Enc28J60Network::blockSize(appdata.packet_in);
+  int size = uip_enc[if_idx]->blockSize(appdata.packet_in);
 #if ACTLOGLEVEL>=LOG_DEBUG
   if (appdata.packet_in != NOBLOCK)
     {
@@ -271,8 +272,8 @@ UIPUDP::available(void)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPUDP::available(void) DEBUG_V3:Function started"));
   #endif
-  eth.tick();
-  return Enc28J60Network::blockSize(appdata.packet_in);
+  uip_eth[if_idx]->tick();
+  return uip_enc[if_idx]->blockSize(appdata.packet_in);
 }
 
 // Read a single byte from the current packet
@@ -298,17 +299,17 @@ UIPUDP::read(unsigned char* buffer, size_t len)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPUDP::read(unsigned char* buffer, size_t len) DEBUG_V3:Function started"));
   #endif
-  eth.tick();
+  uip_eth[if_idx]->tick();
   if (appdata.packet_in != NOBLOCK)
     {
-      memaddress read = Enc28J60Network::readPacket(appdata.packet_in,0,(uint8_t*)buffer,(uint16_t)len);
-      if (read == Enc28J60Network::blockSize(appdata.packet_in))
+      memaddress read = uip_enc[if_idx]->readPacket(appdata.packet_in,0,(uint8_t*)buffer,(uint16_t)len);
+      if (read == uip_enc[if_idx]->blockSize(appdata.packet_in))
         {
-          Enc28J60Network::freeBlock(appdata.packet_in);
+          uip_enc[if_idx]->freeBlock(appdata.packet_in);
           appdata.packet_in = NOBLOCK;
         }
       else
-        Enc28J60Network::resizeBlock(appdata.packet_in,read);
+        uip_enc[if_idx]->resizeBlock(appdata.packet_in,read);
       return read;
     }
   return 0;
@@ -321,11 +322,11 @@ UIPUDP::peek(void)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPUDP::peek(void) DEBUG_V3:Function started"));
   #endif
-  eth.tick();
+  uip_eth[if_idx]->tick();
   if (appdata.packet_in != NOBLOCK)
     {
       unsigned char c;
-      if (Enc28J60Network::readPacket(appdata.packet_in,0,(uint8_t*)&c,1) == 1)
+      if (uip_enc[if_idx]->readPacket(appdata.packet_in,0,(uint8_t*)&c,1) == 1)
         return c;
     }
   return -1;
@@ -338,8 +339,8 @@ UIPUDP::flush(void)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPUDP::flush(void) DEBUG_V3:Function started"));
   #endif
-  eth.tick();
-  Enc28J60Network::freeBlock(appdata.packet_in);
+  uip_eth[if_idx]->tick();
+  uip_enc[if_idx]->freeBlock(appdata.packet_in);
   appdata.packet_in = NOBLOCK;
 }
 
@@ -378,17 +379,17 @@ uipudp_appcall(void) {
             {
               uip_udp_conn[if_idx]->rport = UDPBUF->srcport;
               uip_ipaddr_copy(uip_udp_conn[if_idx]->ripaddr,UDPBUF->srcipaddr);
-              data->packet_next = Enc28J60Network::allocBlock(ntohs(UDPBUF->udplen)-UIP_UDPH_LEN);
+              data->packet_next = uip_enc[if_idx]->allocBlock(ntohs(UDPBUF->udplen)-UIP_UDPH_LEN);
                   //if we are unable to allocate memory the packet is dropped. udp doesn't guarantee packet delivery
               if (data->packet_next != NOBLOCK)
                 {
                   //discard Linklevel and IP and udp-header and any trailing bytes:
-                  Enc28J60Network::copyPacket(data->packet_next,0,eth.in_packet,UIP_UDP_PHYH_LEN,Enc28J60Network::blockSize(data->packet_next));
+                  uip_enc[if_idx]->copyPacket(data->packet_next,0,uip_eth[if_idx]->in_packet,UIP_UDP_PHYH_LEN,uip_enc[if_idx]->blockSize(data->packet_next));
     #if ACTLOGLEVEL>=LOG_DEBUG
                   LogObject.uart_send_str(F("uipudp_appcall(void) DEBUG:udp, uip_newdata received packet: "));
                   LogObject.uart_send_dec(data->packet_next);
                   LogObject.uart_send_str(F(", size: "));
-                  LogObject.uart_send_decln(Enc28J60Network::blockSize(data->packet_next));
+                  LogObject.uart_send_decln(uip_enc[if_idx]->blockSize(data->packet_next));
     #endif
                 }
             }
@@ -400,10 +401,10 @@ uipudp_appcall(void) {
           LogObject.uart_send_str(F("uipudp_appcall(void) DEBUG:udp, uip_poll preparing packet to send: "));
           LogObject.uart_send_dec(data->packet_out);
           LogObject.uart_send_str(F(", size: "));
-          LogObject.uart_send_decln(Enc28J60Network::blockSize(data->packet_out));
+          LogObject.uart_send_decln(uip_enc[if_idx]->blockSize(data->packet_out));
 #endif
-          eth.uip_packet = data->packet_out;
-          eth.uip_hdrlen = UIP_UDP_PHYH_LEN;
+          uip_eth[if_idx]->uip_packet = data->packet_out;
+          uip_eth[if_idx]->uip_hdrlen = UIP_UDP_PHYH_LEN;
           uip_udp_send(data->out_pos - (UIP_UDP_PHYH_LEN));
         }
     }
@@ -417,8 +418,8 @@ UIPUDP::_send(uip_udp_userdata_t *data) {
   uip_arp_out(); //add arp
   if (uip_len[if_idx] == UIP_ARPHDRSIZE)
     {
-      eth.uip_packet = NOBLOCK;
-      eth.packetstate &= ~UIPETHERNET_SENDPACKET;
+      uip_eth[if_idx]->uip_packet = NOBLOCK;
+      uip_eth[if_idx]->packetstate &= ~UIPETHERNET_SENDPACKET;
 #if ACTLOGLEVEL>=LOG_DEBUG
       LogObject.uart_send_strln(F("UIPUDP::_send() DEBUG:udp, uip_poll results in ARP-packet"));
 #endif
@@ -428,13 +429,13 @@ UIPUDP::_send(uip_udp_userdata_t *data) {
     {
       data->send = false;
       data->packet_out = NOBLOCK;
-      eth.packetstate |= UIPETHERNET_SENDPACKET;
+      uip_eth[if_idx]->packetstate |= UIPETHERNET_SENDPACKET;
 #if ACTLOGLEVEL>=LOG_DEBUG
       LogObject.uart_send_str(F("UIPUDP::_send() DEBUG:udp, uip_packet to send: "));
-      LogObject.uart_send_decln(eth.uip_packet);
+      LogObject.uart_send_decln(uip_eth[if_idx]->uip_packet);
 #endif
     }
-  eth.network_send();
+  uip_eth[if_idx]->network_send();
 }
 #endif
 

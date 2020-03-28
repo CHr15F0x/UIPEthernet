@@ -56,8 +56,6 @@ typedef struct {
   bool send;
 } uip_udp_userdata_t;
 
-class UIPEthernetClass;
-
 #if defined(ARDUINO) && !defined(STM32F3) && !defined(__RFduino__)
   class UIPUDP : public UDP {
 #endif
@@ -65,13 +63,12 @@ class UIPEthernetClass;
   class UIPUDP : public Print, public UDP {
 #endif
 private:
-  UIPEthernetClass &eth;
   struct uip_udp_conn *_uip_udp_conn;
  
   uip_udp_userdata_t appdata;
  
 public:
-  UIPUDP(UIPEthernetClass &);   // Constructor
+  UIPUDP();   // Constructor
   virtual uint8_t   begin(uint16_t);// initialize, start listening on specified port. Returns 1 if successful, 0 if there are no sockets available to use
   virtual void      stop(void);  // Finish with the UDP socket
  
@@ -125,7 +122,7 @@ private:
   friend void uipudp_appcall(void);
  
   friend class UIPEthernetClass;
-  void _send(uip_udp_userdata_t *data);
+  static void _send(uip_udp_userdata_t *data);
  
 };
  

@@ -438,8 +438,15 @@ void UIPEthernetClass::configure(IPAddress ip, IPAddress dns, IPAddress gateway,
   _dnsServerAddress = dns;
 }
 
+#if UIP_UDP
+DhcpClass Dhcp_0;
+DhcpClass Dhcp_1;
+UIPEthernetClass UIPEthernet_0(Enc28J60_0, Dhcp_0);
+UIPEthernetClass UIPEthernet_1(Enc28J60_1, Dhcp_1);
+#else
 UIPEthernetClass UIPEthernet_0(Enc28J60_0);
 UIPEthernetClass UIPEthernet_1(Enc28J60_1);
+#endif // !UIP_UDP
 UIPEthernetClass *uip_eth[UIP_NUM_INTERFACES] = {&UIPEthernet_0, &UIPEthernet_1};
 
 /*---------------------------------------------------------------------------*/
