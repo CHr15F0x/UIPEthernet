@@ -27,8 +27,7 @@
 #include "UIPEthernet.h"
 #include "utility/logging.h"
 #include "utility/Enc28J60Network.h"
-
-#include "UIPUdp.h"
+#include "Dhcp.h"
 
 extern "C"
 {
@@ -38,34 +37,29 @@ extern "C"
 #include "utility/uip_timer.h"
 }
 
+#include "UIPClient.h"
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 
 #define ETH_HDR ((struct uip_eth_hdr *)&uip_buf[if_idx][0])
 
-memhandle UIPEthernetClass::in_packet(NOBLOCK);
-memhandle UIPEthernetClass::uip_packet(NOBLOCK);
-uint8_t UIPEthernetClass::uip_hdrlen(0);
-uint8_t UIPEthernetClass::packetstate(0);
-
-unsigned long UIPEthernetClass::periodic_timer;
-
-IPAddress UIPEthernetClass::_dnsServerAddress;
 #if UIP_UDP
-  DhcpClass* UIPEthernetClass::_dhcp(NULL);
-  static DhcpClass s_dhcp; // Placing this instance here is saving 40K to final *.bin (see bug below)
+UIPEthernetClass::UIPEthernetClass(Enc28J60Network &enc, DhcpClass &dhcp) :
+#else
+UIPEthernetClass::UIPEthernetClass(Enc28J60Network &enc) :
 #endif
-
-// Because uIP isn't encapsulated within a class we have to use global
-// variables, so we can only have one TCP/IP stack per program.
-
-UIPEthernetClass::UIPEthernetClass()
+  Enc28J60(enc),
+  in_packet(NOBLOCK),
+  uip_packet(NOBLOCK),
+  uip_hdrlen(0),
+  packetstate(0),
+  _dnsServerAddress(),
+#if UIP_UDP
+  _dhcp(dhcp),
+#endif
+  periodic_timer(0) // ?
 {
-}
-
-void UIPEthernetClass::init(const uint8_t pin)
-{
-  ENC28J60ControlCS = pin;
 }
 
 #if UIP_UDP
@@ -75,23 +69,20 @@ UIPEthernetClass::begin(const uint8_t* mac)
   #if ACTLOGLEVEL>=LOG_DEBUG_V3
     LogObject.uart_send_strln(F("UIPEthernetClass::begin(const uint8_t* mac) DEBUG_V3:Function started"));
   #endif
-  //static DhcpClass s_dhcp; // <-- this is a bug !
-  // I leave it there commented for history. It is bring all GCC "new" memory allocation code, making the *.bin almost 40K bigger. I've move it globally.
-  _dhcp = &s_dhcp;
   // Initialise the basic info
   netInit(mac);
 
   // Now try to get our config info from a DHCP server
-  int ret = _dhcp->beginWithDHCP((uint8_t*)mac);
+  int ret = _dhcp.beginWithDHCP((uint8_t*)mac);
   if(ret == 1)
   {
     // We've successfully found a DHCP server and got our configuration info, so set things
     // accordingly
-    configure(_dhcp->getLocalIp(),_dhcp->getDnsServerIp(),_dhcp->getGatewayIp(),_dhcp->getSubnetMask());
+    configure(_dhcp.getLocalIp(),_dhcp.getDnsServerIp(),_dhcp.getGatewayIp(),_dhcp.getSubnetMask());
   }
   return ret;
 }
-#endif
+#endif // UIP_UDP
 
 void
 UIPEthernetClass::begin(const uint8_t* mac, IPAddress ip)
@@ -142,9 +133,9 @@ int UIPEthernetClass::maintain(){
   tick();
   int rc = DHCP_CHECK_NONE;
 #if UIP_UDP
-  if(_dhcp != NULL){
+  if(true /*_dhcp != NULL*/){
     //we have a pointer to dhcp, use it
-    rc = _dhcp->checkLease();
+    rc = _dhcp.checkLease();
     switch ( rc ){
       case DHCP_CHECK_NONE:
         //nothing done
@@ -152,15 +143,15 @@ int UIPEthernetClass::maintain(){
       case DHCP_CHECK_RENEW_OK:
       case DHCP_CHECK_REBIND_OK:
         //we might have got a new IP.
-        configure(_dhcp->getLocalIp(),_dhcp->getDnsServerIp(),_dhcp->getGatewayIp(),_dhcp->getSubnetMask());
+        configure(_dhcp.getLocalIp(),_dhcp.getDnsServerIp(),_dhcp.getGatewayIp(),_dhcp.getSubnetMask());
         break;
       default:
         //this is actually a error, it will retry though
         break;
     }
   }
+#endif // UIP_UDP
   return rc;
-#endif
 }
 
 EthernetLinkStatus UIPEthernetClass::linkStatus()
@@ -217,7 +208,7 @@ UIPEthernetClass::tick()
 #if ACTLOGLEVEL>=LOG_DEBUG_V3
   LogObject.uart_send_strln(F("UIPEthernetClass::tick() DEBUG_V3:Function started"));
 #endif
-if (Enc28J60Network::geterevid()==0)
+if (Enc28J60.geterevid()==0)
    {
    #if ACTLOGLEVEL>=LOG_ERR
      LogObject.uart_send_strln(F("UIPEthernetClass::tick() ERROR:EREVID=0 -> Not found ENC28j60 device !! Function ended !!"));
@@ -229,7 +220,7 @@ if (Enc28J60Network::geterevid()==0)
 #endif
   if (in_packet == NOBLOCK)
     {
-    in_packet = Enc28J60Network::receivePacket();
+    in_packet = Enc28J60.receivePacket();
     #if ACTLOGLEVEL>=LOG_DEBUG
     if (in_packet != NOBLOCK)
       {
@@ -241,10 +232,10 @@ if (Enc28J60Network::geterevid()==0)
   if (in_packet != NOBLOCK)
     {
     packetstate = UIPETHERNET_FREEPACKET;
-    uip_len[if_idx] = Enc28J60Network::blockSize(in_packet);
+    uip_len[if_idx] = Enc28J60.blockSize(in_packet);
     if (uip_len[if_idx] > 0)
       {
-      Enc28J60Network::readPacket(in_packet,0,(uint8_t*)uip_buf[if_idx],UIP_BUFSIZE);
+      Enc28J60.readPacket(in_packet,0,(uint8_t*)uip_buf[if_idx],UIP_BUFSIZE);
       if (ETH_HDR ->type == HTONS(UIP_ETHTYPE_IP))
         {
         uip_packet = in_packet; //required for upper_layer_checksum of in_packet!
@@ -279,7 +270,7 @@ if (Enc28J60Network::geterevid()==0)
         LogObject.uart_send_str(F("UIPEthernetClass::tick() DEBUG:freeing packet: "));
         LogObject.uart_send_decln(in_packet);
       #endif
-      Enc28J60Network::freePacket();
+      Enc28J60.freePacket();
       in_packet = NOBLOCK;
       }
     }
@@ -392,11 +383,11 @@ bool UIPEthernetClass::network_send()
       LogObject.uart_send_str(F(", hdrlen: "));
       LogObject.uart_send_decln(uip_hdrlen);
 #endif
-      Enc28J60Network::writePacket(uip_packet,0,uip_buf[if_idx],uip_hdrlen);
+      Enc28J60.writePacket(uip_packet,0,uip_buf[if_idx],uip_hdrlen);
       packetstate &= ~ UIPETHERNET_SENDPACKET;
       goto sendandfree;
     }
-  uip_packet = Enc28J60Network::allocBlock(uip_len[if_idx]);
+  uip_packet = Enc28J60.allocBlock(uip_len[if_idx]);
   if (uip_packet != NOBLOCK)
     {
 #if ACTLOGLEVEL>=LOG_DEBUG
@@ -405,13 +396,13 @@ bool UIPEthernetClass::network_send()
       LogObject.uart_send_str(F(", packet: "));
       LogObject.uart_send_decln(uip_packet);
 #endif
-      Enc28J60Network::writePacket(uip_packet,0,uip_buf[if_idx],uip_len[if_idx]);
+      Enc28J60.writePacket(uip_packet,0,uip_buf[if_idx],uip_len[if_idx]);
       goto sendandfree;
     }
   return false;
 sendandfree:
-  Enc28J60Network::sendPacket(uip_packet);
-  Enc28J60Network::freeBlock(uip_packet);
+  Enc28J60.sendPacket(uip_packet);
+  Enc28J60.freeBlock(uip_packet);
   uip_packet = NOBLOCK;
   return true;
 }
@@ -422,7 +413,7 @@ void UIPEthernetClass::netInit(const uint8_t* mac) {
   #endif
   periodic_timer = millis() + UIP_PERIODIC_TIMER;
 
-  Enc28J60Network::init((uint8_t*)mac);
+  Enc28J60.init((uint8_t*)mac);
   uip_seteth_addr(mac);
 
   uip_init();
@@ -447,9 +438,9 @@ void UIPEthernetClass::configure(IPAddress ip, IPAddress dns, IPAddress gateway,
   _dnsServerAddress = dns;
 }
 
-UIPEthernetClass UIPEthernet;
-
-UIPEthernetClass UIPEthernet2;
+UIPEthernetClass UIPEthernet_0(Enc28J60_0);
+UIPEthernetClass UIPEthernet_1(Enc28J60_1);
+UIPEthernetClass *uip_eth[UIP_NUM_INTERFACES] = {&UIPEthernet_0, &UIPEthernet_1};
 
 /*---------------------------------------------------------------------------*/
 uint16_t
@@ -533,7 +524,7 @@ uip_tcpchksum(void)
   sum = upper_layer_len + UIP_PROTO_TCP;
 #endif
   /* Sum IP source and destination addresses. */
-  sum = UIPEthernetClass::chksum(sum, (u8_t *)&BUF->srcipaddr[0], 2 * sizeof(uip_ipaddr_t));
+  sum = uip_eth[if_idx]->chksum(sum, (u8_t *)&BUF->srcipaddr[0], 2 * sizeof(uip_ipaddr_t));
 
   uint8_t upper_layer_memlen;
 #if UIP_UDP
@@ -554,7 +545,7 @@ uip_tcpchksum(void)
     break;
   }
 #endif
-  sum = UIPEthernetClass::chksum(sum, &uip_buf[if_idx][UIP_IPH_LEN + UIP_LLH_LEN], upper_layer_memlen);
+  sum = uip_eth[if_idx]->chksum(sum, &uip_buf[if_idx][UIP_IPH_LEN + UIP_LLH_LEN], upper_layer_memlen);
 #if ACTLOGLEVEL>=LOG_DEBUG
   #if UIP_UDP
     LogObject.uart_send_str(F("UIPEthernetClass::upper_layer_chksum(uint8_t proto) DEBUG:uip_buf["));
@@ -569,9 +560,9 @@ uip_tcpchksum(void)
 #endif
   if (upper_layer_memlen < upper_layer_len)
     {
-      sum = Enc28J60Network::chksum(
+      sum = uip_enc[if_idx]->chksum(
           sum,
-          UIPEthernetClass::uip_packet,
+          uip_eth[if_idx]->uip_packet,
           UIP_IPH_LEN + UIP_LLH_LEN + upper_layer_memlen,
           upper_layer_len - upper_layer_memlen
       );
@@ -581,7 +572,7 @@ uip_tcpchksum(void)
       #else
         LogObject.uart_send_str(F("uip_tcpchksum(void) DEBUG:uip_packet("));
       #endif
-      LogObject.uart_send_dec(UIPEthernetClass::uip_packet);
+      LogObject.uart_send_dec(uip_eth[if_idx]->uip_packet);
       LogObject.uart_send_str(F(")["));
       LogObject.uart_send_dec(UIP_IPH_LEN + UIP_LLH_LEN + upper_layer_memlen);
       LogObject.uart_send_str(F("-"));
@@ -596,21 +587,21 @@ uip_tcpchksum(void)
 uint16_t
 uip_ipchksum(void)
 {
-  return UIPEthernet.ipchksum();
+  return uip_eth[if_idx]->ipchksum();
 }
 
 #if UIP_UDP
 uint16_t
 uip_tcpchksum(void)
 {
-  uint16_t sum = UIPEthernet.upper_layer_chksum(UIP_PROTO_TCP);
+  uint16_t sum = uip_eth[if_idx]->upper_layer_chksum(UIP_PROTO_TCP);
   return sum;
 }
 
 uint16_t
 uip_udpchksum(void)
 {
-  uint16_t sum = UIPEthernet.upper_layer_chksum(UIP_PROTO_UDP);
+  uint16_t sum = uip_eth[if_idx]->upper_layer_chksum(UIP_PROTO_UDP);
   return sum;
 }
 #endif

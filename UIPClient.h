@@ -71,6 +71,8 @@ typedef struct {
 #endif
 } uip_userdata_t;
 
+class UIPEthernetClass;
+
 #if defined(ARDUINO) && !defined(STM32F3) && !defined(__RFduino__)
   class UIPClient : public Client {
 #endif
@@ -103,7 +105,7 @@ private:
 
   uip_userdata_t* data;
 
-  static uip_userdata_t all_data[UIP_CONNS];
+  static uip_userdata_t all_data[UIP_NUM_INTERFACES][UIP_CONNS];
   static uip_userdata_t* _allocateData();
 
   static uint16_t _write(uip_userdata_t *,const uint8_t *buf, size_t size);
@@ -124,4 +126,4 @@ private:
 
 };
 
-#endif
+#endif // UIPCLIENT_H

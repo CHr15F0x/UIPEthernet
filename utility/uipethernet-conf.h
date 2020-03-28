@@ -17,7 +17,7 @@
 /* for UDP
  * set UIP_CONF_UDP to 0 to disable UDP (saves aprox. 5kb flash) */
 #ifndef UIP_CONF_UDP
-#define UIP_CONF_UDP             1
+#define UIP_CONF_UDP             0
 #endif
 #ifndef UIP_CONF_BROADCAST
 #define UIP_CONF_BROADCAST       1

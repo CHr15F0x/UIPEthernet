@@ -35,11 +35,15 @@
 #include "utility/Enc28J60Network.h"
 #include "utility/uipopt.h"
 #include "Dhcp.h"
+
 #if UIP_UDP
   #include "UIPUdp.h"
 #endif
+
+#if 0
 #include "UIPClient.h"
 #include "UIPServer.h"
+#endif
 
 extern "C"
 {
@@ -73,12 +77,18 @@ enum EthernetLinkStatus {
   LinkOFF
 };
 
+#if UIP_UDP
+class DhcpClass;
+#endif
+
 class UIPEthernetClass
 {
 public:
-  UIPEthernetClass();
-
-  void init(const uint8_t pin);
+#if UIP_UDP
+  UIPEthernetClass(Enc28J60Network &, DhcpClass &);
+#else
+  UIPEthernetClass(Enc28J60Network &);
+#endif
 
   int begin(const uint8_t* mac);
   void begin(const uint8_t* mac, IPAddress ip);
@@ -99,35 +109,40 @@ public:
   IPAddress dnsServerIP();
 
 private:
-  static memhandle in_packet;
-  static memhandle uip_packet;
-  static uint8_t uip_hdrlen;
-  static uint8_t packetstate;
+  Enc28J60Network &Enc28J60;
+  memhandle in_packet;
+  memhandle uip_packet;
+  uint8_t uip_hdrlen;
+  uint8_t packetstate;
   
-  static IPAddress _dnsServerAddress;
+  IPAddress _dnsServerAddress;
+
   #if UIP_UDP
-    static DhcpClass* _dhcp;
+    DhcpClass &_dhcp;
   #endif
-  static unsigned long periodic_timer;
 
-  static void netInit(const uint8_t* mac);
-  static void configure(IPAddress ip, IPAddress dns, IPAddress gateway, IPAddress subnet);
+  unsigned long periodic_timer;
 
-  static void tick();
+  void netInit(const uint8_t* mac);
+  void configure(IPAddress ip, IPAddress dns, IPAddress gateway, IPAddress subnet);
 
-  static bool network_send();
+  void tick();
+
+  bool network_send();
 
   friend class UIPServer;
 
   friend class UIPClient;
-
-  friend class UIPUDP;
-
-  static uint16_t chksum(uint16_t sum, const uint8_t* data, uint16_t len);
-  static uint16_t ipchksum(void);
 #if UIP_UDP
-  static uint16_t upper_layer_chksum(uint8_t proto);
+  friend class UIPUDP;
 #endif
+  uint16_t chksum(uint16_t sum, const uint8_t* data, uint16_t len);
+  uint16_t ipchksum(void);
+
+#if UIP_UDP
+  uint16_t upper_layer_chksum(uint8_t proto);
+#endif
+
   friend uint16_t uip_ipchksum(void);
   friend uint16_t uip_tcpchksum(void);
   friend uint16_t uip_udpchksum(void);
@@ -140,7 +155,8 @@ private:
 #endif /* UIP_CONF_IPV6 */
 };
 
-extern UIPEthernetClass UIPEthernet;
-extern UIPEthernetClass UIPEthernet2;
+extern UIPEthernetClass UIPEthernet_0;
+extern UIPEthernetClass UIPEthernet_1;
+extern UIPEthernetClass *uip_eth[UIP_NUM_INTERFACES];
 
-#endif
+#endif // UIPETHERNET_H

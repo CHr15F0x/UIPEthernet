@@ -80,7 +80,7 @@
         #define ENC28J60_CONTROL_CS     PIN_A10
         #warning "Using LEONARDO borad PIN_A10 for ENC28J60_CONTROL_CS. Use UIPEthernet::init(uint8_t) to change it."
       #else
-        #define ENC28J60_CONTROL_CS     D1 //SS
+        #define ENC28J60_CONTROL_CS     SS //klis: unused
       #endif
    #elif defined(ARDUINO_ARCH_AMEBA) //Defined SS to pin 10
       #define ENC28J60_CONTROL_CS     SS //PC_0 A5 10
@@ -115,8 +115,6 @@
    #warning "Default ENC28J60_CONTROL_CS could not be defined! Use UIPEthernet::init(uint8_t) to set it."
    #define ENC28J60_CONTROL_CS 0
 #endif
-
-extern uint8_t ENC28J60ControlCS;
 
 #if !defined(SPI_MOSI)
    #if defined(__AVR__) || defined(ESP8266) || defined(__RFduino__)
@@ -224,39 +222,50 @@ extern uint8_t ENC28J60ControlCS;
 
 class Enc28J60Network : public MemoryPool
 {
+public:
+  Enc28J60Network(uint8_t cs) :
+    ENC28J60ControlCS(cs),
+    nextPacketPtr(0),
+    bank(0xff),
+    erevid(0),
+    receivePkt(),
+    broadcast_enabled(false)
+  {
+  }
 
 private:
-  static uint16_t nextPacketPtr;
-  static uint8_t bank;
-  static uint8_t erevid;
+  uint8_t ENC28J60ControlCS;
+  uint16_t nextPacketPtr;
+  uint8_t bank;
+  uint8_t erevid;
 
-  static struct memblock receivePkt;
+  struct memblock receivePkt;
 
-  static bool broadcast_enabled; //!< True if broadcasts enabled (used to allow temporary disable of broadcast for DHCP or other internal functions)
+  bool broadcast_enabled; //!< True if broadcasts enabled (used to allow temporary disable of broadcast for DHCP or other internal functions)
 
-  static uint8_t readOp(uint8_t op, uint8_t address);
-  static void writeOp(uint8_t op, uint8_t address, uint8_t data);
-  static uint16_t setReadPtr(memhandle handle, memaddress position, uint16_t len);
-  static void setERXRDPT(void);
-  static void readBuffer(uint16_t len, uint8_t* data);
-  static void writeBuffer(uint16_t len, uint8_t* data);
-  static uint8_t readByte(uint16_t addr);
-  static void writeByte(uint16_t addr, uint8_t data);
-  static void setBank(uint8_t address);
-  static uint8_t readReg(uint8_t address);
-  static void writeReg(uint8_t address, uint8_t data);
-  static void writeRegPair(uint8_t address, uint16_t data);
-  static void phyWrite(uint8_t address, uint16_t data);
-  static uint16_t phyRead(uint8_t address);
-  static void clkout(uint8_t clk);
+  uint8_t readOp(uint8_t op, uint8_t address);
+  void writeOp(uint8_t op, uint8_t address, uint8_t data);
+  uint16_t setReadPtr(memhandle handle, memaddress position, uint16_t len);
+  void setERXRDPT(void);
+  void readBuffer(uint16_t len, uint8_t* data);
+  void writeBuffer(uint16_t len, uint8_t* data);
+  uint8_t readByte(uint16_t addr);
+  void writeByte(uint16_t addr, uint8_t data);
+  void setBank(uint8_t address);
+  uint8_t readReg(uint8_t address);
+  void writeReg(uint8_t address, uint8_t data);
+  void writeRegPair(uint8_t address, uint16_t data);
+  void phyWrite(uint8_t address, uint16_t data);
+  uint16_t phyRead(uint8_t address);
+  void clkout(uint8_t clk);
 
-  static void enableBroadcast (bool temporary);
-  static void disableBroadcast (bool temporary);
-  static void enableMulticast (void);
-  static void disableMulticast (void);
+  void enableBroadcast (bool temporary);
+  void disableBroadcast (bool temporary);
+  void enableMulticast (void);
+  void disableMulticast (void);
 
-  static uint8_t readRegByte (uint8_t address);
-  static void writeRegByte (uint8_t address, uint8_t data);
+  uint8_t readRegByte (uint8_t address);
+  void writeRegByte (uint8_t address, uint8_t data);
 
   friend void enc28J60_mempool_block_move_callback(memaddress,memaddress,memaddress);
 
@@ -264,20 +273,23 @@ public:
 
   void powerOn(void);
   void powerOff(void);
-  static uint8_t geterevid(void);
+  uint8_t geterevid(void);
   uint16_t PhyStatus(void);
-  static bool linkStatus(void);
+  bool linkStatus(void);
 
-  static void init(uint8_t* macaddr);
-  static memhandle receivePacket(void);
-  static void freePacket(void);
-  static memaddress blockSize(memhandle handle);
-  static void sendPacket(memhandle handle);
-  static uint16_t readPacket(memhandle handle, memaddress position, uint8_t* buffer, uint16_t len);
-  static uint16_t writePacket(memhandle handle, memaddress position, uint8_t* buffer, uint16_t len);
-  static void copyPacket(memhandle dest, memaddress dest_pos, memhandle src, memaddress src_pos, uint16_t len);
-  static uint16_t chksum(uint16_t sum, memhandle handle, memaddress pos, uint16_t len);
+  void init(uint8_t* macaddr);
+  memhandle receivePacket(void);
+  void freePacket(void);
+  memaddress blockSize(memhandle handle);
+  void sendPacket(memhandle handle);
+  uint16_t readPacket(memhandle handle, memaddress position, uint8_t* buffer, uint16_t len);
+  uint16_t writePacket(memhandle handle, memaddress position, uint8_t* buffer, uint16_t len);
+  void copyPacket(memhandle dest, memaddress dest_pos, memhandle src, memaddress src_pos, uint16_t len);
+  uint16_t chksum(uint16_t sum, memhandle handle, memaddress pos, uint16_t len);
 };
 
-extern Enc28J60Network Enc28J60;
+extern Enc28J60Network Enc28J60_0;
+extern Enc28J60Network Enc28J60_1;
+extern Enc28J60Network *uip_enc[UIP_NUM_INTERFACES];
+
 #endif /* Enc28J60NetworkClass_H_ */

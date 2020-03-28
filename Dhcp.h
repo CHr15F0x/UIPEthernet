@@ -182,5 +182,5 @@ public:
   int beginWithDHCP(uint8_t *);
   int checkLease(void);
 };
-#endif
-#endif
+#endif // UIP_UDP
+#endif // Dhcp_h

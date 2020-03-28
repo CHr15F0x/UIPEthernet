@@ -43,7 +43,7 @@
 extern "C" {
   #include "utility/uip.h"
 }
- 
+
 #define UIP_UDP_MAXDATALEN 1500
 #define UIP_UDP_PHYH_LEN UIP_LLH_LEN+UIP_IPUDPH_LEN
 #define UIP_UDP_MAXPACKETSIZE UIP_UDP_MAXDATALEN+UIP_UDP_PHYH_LEN
@@ -55,7 +55,9 @@ typedef struct {
   memhandle packet_out;
   bool send;
 } uip_udp_userdata_t;
- 
+
+class UIPEthernetClass;
+
 #if defined(ARDUINO) && !defined(STM32F3) && !defined(__RFduino__)
   class UIPUDP : public UDP {
 #endif
@@ -63,12 +65,13 @@ typedef struct {
   class UIPUDP : public Print, public UDP {
 #endif
 private:
+  UIPEthernetClass &eth;
   struct uip_udp_conn *_uip_udp_conn;
  
   uip_udp_userdata_t appdata;
  
 public:
-  UIPUDP(void);   // Constructor
+  UIPUDP(UIPEthernetClass &);   // Constructor
   virtual uint8_t   begin(uint16_t);// initialize, start listening on specified port. Returns 1 if successful, 0 if there are no sockets available to use
   virtual void      stop(void);  // Finish with the UDP socket
  
@@ -122,7 +125,7 @@ private:
   friend void uipudp_appcall(void);
  
   friend class UIPEthernetClass;
-  static void _send(uip_udp_userdata_t *data);
+  void _send(uip_udp_userdata_t *data);
  
 };
  

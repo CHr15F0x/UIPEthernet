@@ -29,8 +29,8 @@ UIPServer::UIPServer(uint16_t port) : _port(htons(port))
 
 UIPClient UIPServer::available()
 {
-  UIPEthernetClass::tick();
-  for ( uip_userdata_t* data = &UIPClient::all_data[0]; data < &UIPClient::all_data[UIP_CONNS]; data++ )
+  uip_eth[if_idx]->tick();
+  for ( uip_userdata_t* data = &UIPClient::all_data[if_idx][0]; data < &UIPClient::all_data[if_idx][UIP_CONNS]; data++ )
     {
       if (data->packets_in[0] != NOBLOCK
           && (((data->state & UIP_CLIENT_CONNECTED) && uip_conns[if_idx][data->conn_index].lport ==_port)
@@ -42,8 +42,8 @@ UIPClient UIPServer::available()
 
 UIPClient UIPServer::accept()
 {
-  UIPEthernetClass::tick();
-  for ( uip_userdata_t* data = &UIPClient::all_data[0]; data < &UIPClient::all_data[UIP_CONNS]; data++ )
+  uip_eth[if_idx]->tick();
+  for ( uip_userdata_t* data = &UIPClient::all_data[if_idx][0]; data < &UIPClient::all_data[if_idx][UIP_CONNS]; data++ )
     {
       if (!(data->state & UIP_CLIENT_ACCEPTED)
           && (((data->state & UIP_CLIENT_CONNECTED) && uip_conns[if_idx][data->conn_index].lport ==_port)
@@ -58,7 +58,7 @@ UIPClient UIPServer::accept()
 void UIPServer::begin()
 {
   uip_listen(_port);
-  UIPEthernetClass::tick();
+  uip_eth[if_idx]->tick();
 }
 
 void UIPServer::begin(uint16_t port) {
@@ -74,7 +74,7 @@ size_t UIPServer::write(uint8_t c)
 size_t UIPServer::write(const uint8_t *buf, size_t size)
 {
   size_t ret = 0;
-  for ( uip_userdata_t* data = &UIPClient::all_data[0]; data < &UIPClient::all_data[UIP_CONNS]; data++ )
+  for ( uip_userdata_t* data = &UIPClient::all_data[if_idx][0]; data < &UIPClient::all_data[if_idx][UIP_CONNS]; data++ )
     {
       if ((data->state & UIP_CLIENT_CONNECTED) && uip_conns[if_idx][data->conn_index].lport ==_port)
         ret += UIPClient::_write(data,buf,size);

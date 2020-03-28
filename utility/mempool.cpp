@@ -23,8 +23,6 @@
 
 #define POOLOFFSET 1
 
-struct memblock MemoryPool::blocks[MEMPOOL_NUM_MEMBLOCKS+1];
-
 void
 MemoryPool::init()
 {

@@ -33,8 +33,6 @@
 #endif
 #include "logging.h"
 
-uint8_t ENC28J60ControlCS = ENC28J60_CONTROL_CS;
-
 #if ENC28J60_USE_SPILIB
    #if defined(ARDUINO)
      #if defined(STM32F2)
@@ -89,15 +87,6 @@ extern "C" {
 #if defined(ARDUINO_ARCH_AVR)
 #define waitspi() while(!(SPSR&(1<<SPIF)))
 #endif
-
-uint16_t Enc28J60Network::nextPacketPtr;
-uint8_t Enc28J60Network::bank=0xff;
-uint8_t Enc28J60Network::erevid=0;
-
-struct memblock Enc28J60Network::receivePkt;
-
-bool Enc28J60Network::broadcast_enabled = false;
-
 
 void Enc28J60Network::init(uint8_t* macaddr)
 {
@@ -747,7 +736,7 @@ enc28J60_mempool_block_move_callback(memaddress dest, memaddress src, memaddress
   //as ENC28J60 DMA is unable to copy single bytes:
   if (len == 1)
     {
-      Enc28J60Network::writeByte(dest,Enc28J60Network::readByte(src));
+      uip_enc[if_idx]->writeByte(dest,uip_enc[if_idx]->readByte(src));
     }
   else
     {
@@ -768,11 +757,11 @@ enc28J60_mempool_block_move_callback(memaddress dest, memaddress src, memaddress
        prevent a never ending DMA operation which
        would overwrite the entire 8-Kbyte buffer.
        */
-      Enc28J60Network::writeRegPair(EDMASTL, src);
-      Enc28J60Network::writeRegPair(EDMADSTL, dest);
+      uip_enc[if_idx]->writeRegPair(EDMASTL, src);
+      uip_enc[if_idx]->writeRegPair(EDMADSTL, dest);
 
       if ((src <= RXSTOP_INIT)&& (len > RXSTOP_INIT))len -= ((RXSTOP_INIT + 1)-RXSTART_INIT);
-      Enc28J60Network::writeRegPair(EDMANDL, len);
+      uip_enc[if_idx]->writeRegPair(EDMANDL, len);
 
       /*
        2. If an interrupt at the end of the copy process is
@@ -780,13 +769,13 @@ enc28J60_mempool_block_move_callback(memaddress dest, memaddress src, memaddress
        clear EIR.DMAIF.
 
        3. Verify that ECON1.CSUMEN is clear. */
-      Enc28J60Network::writeOp(ENC28J60_BIT_FIELD_CLR, ECON1, ECON1_CSUMEN);
+      uip_enc[if_idx]->writeOp(ENC28J60_BIT_FIELD_CLR, ECON1, ECON1_CSUMEN);
 
       /* 4. Start the DMA copy by setting ECON1.DMAST. */
-      Enc28J60Network::writeOp(ENC28J60_BIT_FIELD_SET, ECON1, ECON1_DMAST);
+      uip_enc[if_idx]->writeOp(ENC28J60_BIT_FIELD_SET, ECON1, ECON1_DMAST);
 
       // wait until runnig DMA is completed
-      while (Enc28J60Network::readOp(ENC28J60_READ_CTRL_REG, ECON1) & ECON1_DMAST)
+      while (uip_enc[if_idx]->readOp(ENC28J60_READ_CTRL_REG, ECON1) & ECON1_DMAST)
          {
          delay(1);
          }
@@ -1224,4 +1213,6 @@ Enc28J60Network::linkStatus(void)
   return (phyRead(PHSTAT2) & 0x0400) > 0;
 }
 
-Enc28J60Network Enc28J60;
+Enc28J60Network Enc28J60_0(D1);
+Enc28J60Network Enc28J60_1(D2);
+Enc28J60Network *uip_enc[UIP_NUM_INTERFACES] = {&Enc28J60_0, &Enc28J60_1};
