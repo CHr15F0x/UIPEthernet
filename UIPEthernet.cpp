@@ -45,7 +45,7 @@ extern "C"
 #define ETH_HDR ((struct uip_eth_hdr *)&uip_buf[if_idx][0])
 
 #if UIP_UDP
-UIPEthernetClass::UIPEthernetClass(Enc28J60Network &enc, DhcpClass &dhcp) :
+UIPEthernetClass::UIPEthernetClass(Enc28J60Network &enc, DhcpClass *dhcp) :
 #else
 UIPEthernetClass::UIPEthernetClass(Enc28J60Network &enc) :
 #endif
@@ -71,14 +71,17 @@ UIPEthernetClass::begin(const uint8_t* mac)
   #endif
   // Initialise the basic info
   netInit(mac);
-
-  // Now try to get our config info from a DHCP server
-  int ret = _dhcp.beginWithDHCP((uint8_t*)mac);
-  if(ret == 1)
+  int ret = DHCP_CHECK_NONE;
+  if (_dhcp != NULL)
   {
-    // We've successfully found a DHCP server and got our configuration info, so set things
-    // accordingly
-    configure(_dhcp.getLocalIp(),_dhcp.getDnsServerIp(),_dhcp.getGatewayIp(),_dhcp.getSubnetMask());
+    // Now try to get our config info from a DHCP server
+    ret = _dhcp->beginWithDHCP((uint8_t*)mac);
+    if(ret == 1)
+    {
+      // We've successfully found a DHCP server and got our configuration info, so set things
+      // accordingly
+      configure(_dhcp->getLocalIp(),_dhcp->getDnsServerIp(),_dhcp->getGatewayIp(),_dhcp->getSubnetMask());
+    }
   }
   return ret;
 }
@@ -133,9 +136,9 @@ int UIPEthernetClass::maintain(){
   tick();
   int rc = DHCP_CHECK_NONE;
 #if UIP_UDP
-  if(true /*_dhcp != NULL*/){
+  if(_dhcp != NULL){
     //we have a pointer to dhcp, use it
-    rc = _dhcp.checkLease();
+    rc = _dhcp->checkLease();
     switch ( rc ){
       case DHCP_CHECK_NONE:
         //nothing done
@@ -143,7 +146,7 @@ int UIPEthernetClass::maintain(){
       case DHCP_CHECK_RENEW_OK:
       case DHCP_CHECK_REBIND_OK:
         //we might have got a new IP.
-        configure(_dhcp.getLocalIp(),_dhcp.getDnsServerIp(),_dhcp.getGatewayIp(),_dhcp.getSubnetMask());
+        configure(_dhcp->getLocalIp(),_dhcp->getDnsServerIp(),_dhcp->getGatewayIp(),_dhcp->getSubnetMask());
         break;
       default:
         //this is actually a error, it will retry though
@@ -439,11 +442,16 @@ void UIPEthernetClass::configure(IPAddress ip, IPAddress dns, IPAddress gateway,
 }
 
 #if UIP_UDP
+#if UIP_DHCP
 DhcpClass Dhcp_0;
 DhcpClass Dhcp_1;
-UIPEthernetClass UIPEthernet_0(Enc28J60_0, Dhcp_0);
-UIPEthernetClass UIPEthernet_1(Enc28J60_1, Dhcp_1);
-#else
+UIPEthernetClass UIPEthernet_0(Enc28J60_0, &Dhcp_0);
+UIPEthernetClass UIPEthernet_1(Enc28J60_1, &Dhcp_1);
+#else // !UIP_DHCP
+UIPEthernetClass UIPEthernet_0(Enc28J60_0, NULL);
+UIPEthernetClass UIPEthernet_1(Enc28J60_1, NULL);
+#endif // !UIP_DHCP
+#else // !UIP_UDP
 UIPEthernetClass UIPEthernet_0(Enc28J60_0);
 UIPEthernetClass UIPEthernet_1(Enc28J60_1);
 #endif // !UIP_UDP

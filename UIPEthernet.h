@@ -40,11 +40,6 @@
   #include "UIPUdp.h"
 #endif
 
-#if 0
-#include "UIPClient.h"
-#include "UIPServer.h"
-#endif
-
 extern "C"
 {
 #include "utility/uip_timer.h"
@@ -85,7 +80,7 @@ class UIPEthernetClass
 {
 public:
 #if UIP_UDP
-  UIPEthernetClass(Enc28J60Network &, DhcpClass &);
+  UIPEthernetClass(Enc28J60Network &, DhcpClass *);
 #else
   UIPEthernetClass(Enc28J60Network &);
 #endif
@@ -118,7 +113,7 @@ private:
   IPAddress _dnsServerAddress;
 
   #if UIP_UDP
-    DhcpClass &_dhcp;
+    DhcpClass *_dhcp;
   #endif
 
   unsigned long periodic_timer;

@@ -27,6 +27,7 @@
 //#define ACTLOGLEVEL LOG_INFO
 //#define ACTLOGLEVEL LOG_DEBUG_V2
 
+
 #if ACTLOGLEVEL>LOG_NONE 
    #if defined(ARDUINO)
      #if defined(__STM32F1__) || defined(__STM32F3__) || defined(STM32F3) || defined(__STM32F4__) || defined(ARDUINO_ARCH_SAM)
