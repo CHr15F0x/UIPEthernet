@@ -1,3 +1,17 @@
+# Introduction
+This is a fork of the awesome Ethernet stack: https://github.com/UIPEthernet/UIPEthernet.<br/>
+<br/>
+<br/>
+The original project only supports a __single Ethernet interface__, which may be too little in some specific applications.<br/>
+This fork adds support for __multiple instances of Ethernet interfaces based on multiple ENC28J60 network chips__.<br/>
+<br/>
+Tested on __ESP8266 with two ENC28J60 ethernet controller chips__.<br/>
+<br/>
+Original UIPEthernet docs follow :)<br/>
+<br/>
+<br/>
+<br/>
+<br/>
 # UIPEthernet
 UIPEthernet library for Arduinos (Atmel AVR-s,Atmel SAM3X8E ARM Cortex-M3,STM32F series,ESP8266,Intel ARC32(Genuino101),Nordic nRF51(RFduino),Teensy boards,Realtek Ameba(RTL8195A,RTL8710)), ENC28j60 network chip compatible with Wiznet W5100 API
 
